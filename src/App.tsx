@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { FileSpreadsheet, X, ChevronDown, LayoutGrid, Table2 } from 'lucide-react';
+import { FileSpreadsheet, X, ChevronDown, LayoutGrid, Table2, AreaChart } from 'lucide-react';
 import DropZone from './components/DropZone';
 import SheetTable from './components/SheetTable';
 import SheetStats from './components/SheetStats';
+import SheetCharts from './components/SheetCharts';
 import { parseExcelFile } from './utils/parseExcel';
 import type { WorkbookData } from './types/excel';
 
-type View = 'table' | 'stats';
+type View = 'table' | 'stats' | 'charts';
 
 export default function App() {
   const [workbook, setWorkbook] = useState<WorkbookData | null>(null);
@@ -136,6 +137,14 @@ export default function App() {
                 >
                   <LayoutGrid size={14} /> Stats
                 </button>
+                <button
+                  onClick={() => setView('charts')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 transition-colors ${
+                    view === 'charts' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <AreaChart size={14} /> Charts
+                </button>
               </div>
             </div>
 
@@ -178,7 +187,7 @@ export default function App() {
                   </div>
                 ) : view === 'table' ? (
                   <SheetTable sheet={sheet} fileName={workbook.fileName} />
-                ) : (
+                ) : view === 'stats' ? (
                   <div className="flex flex-col gap-3">
                     <p className="text-sm text-slate-500">
                       Column overview for <strong>{sheet.name}</strong> — {sheet.headers.length} columns,{' '}
@@ -186,6 +195,8 @@ export default function App() {
                     </p>
                     <SheetStats sheet={sheet} />
                   </div>
+                ) : (
+                  <SheetCharts sheet={sheet} />
                 )}
               </>
             )}
