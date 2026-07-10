@@ -7,8 +7,9 @@ export function parseExcelFile(file: File): Promise<WorkbookData> {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        // Force cellDates to true and raw to false to let SheetJS parse and format Excel/CSV date serial codes automatically
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true, raw: false });
+        // cellDates: false ensures that CSV/Excel dates are loaded exactly as pre-formatted strings (e.g. 11/08/1966)
+        // rather than parsed into standard short JavaScript Date formats
+        const workbook = XLSX.read(data, { type: 'array', cellDates: false, raw: false });
 
         const sheets: SheetData[] = workbook.SheetNames.map((name) => {
           const worksheet = workbook.Sheets[name];
