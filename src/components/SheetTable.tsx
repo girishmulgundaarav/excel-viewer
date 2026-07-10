@@ -18,6 +18,7 @@ export default function SheetTable({ sheet, fileName }: SheetTableProps) {
   const [page, setPage] = useState(1);
   const [showColPanel, setShowColPanel] = useState(false);
   const [hiddenCols, setHiddenCols] = useState<Record<number, boolean>>({});
+  const [fontSize, setFontSize] = useState<number>(14); // default font size is 14px (text-sm is 14px)
   const PAGE_SIZE = 50;
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -197,6 +198,25 @@ export default function SheetTable({ sheet, fileName }: SheetTableProps) {
               Clear Filters ({Object.keys(columnFilters).filter((k) => columnFilters[Number(k)]?.trim()).length})
             </button>
           )}
+
+          {/* Font Resizing Controls */}
+          <div className="flex items-center rounded-lg border border-slate-200 bg-white px-1.5 shadow-sm text-sm">
+            <button
+              onClick={() => setFontSize((sz) => Math.max(10, sz - 1))}
+              title="Decrease Font Size"
+              className="flex h-7 w-7 items-center justify-center rounded-md font-bold text-slate-500 hover:bg-slate-100 hover:text-indigo-600 active:bg-slate-200 transition-colors"
+            >
+              A-
+            </button>
+            <span className="px-2 font-semibold text-slate-700 select-none text-xs">{fontSize}px</span>
+            <button
+              onClick={() => setFontSize((sz) => Math.min(24, sz + 1))}
+              title="Increase Font Size"
+              className="flex h-7 w-7 items-center justify-center rounded-md font-bold text-slate-500 hover:bg-slate-100 hover:text-indigo-600 active:bg-slate-200 transition-colors"
+            >
+              A+
+            </button>
+          </div>
         </div>
         <div className="hidden lg:flex items-center gap-1.5 text-xs text-indigo-500 bg-indigo-50 px-3 py-2 rounded-lg border border-indigo-100 shadow-sm">
           <span className="font-semibold">💡 Pro-tip:</span>
@@ -275,7 +295,7 @@ export default function SheetTable({ sheet, fileName }: SheetTableProps) {
 
       {/* Table */}
       <div ref={tableContainerRef} className="overflow-auto rounded-xl border border-slate-200 shadow-sm max-h-[calc(100vh-280px)]">
-        <table className="min-w-full text-sm border-collapse">
+        <table className="min-w-full border-collapse" style={{ fontSize: `${fontSize}px` }}>
           <thead className="sticky top-0 z-10 bg-indigo-600 shadow-[0_2px_4px_rgba(0,0,0,0.08)]">
             <tr className="bg-gradient-to-r from-indigo-600 to-violet-600 text-white">
               <th className="w-10 px-3 py-3 text-center font-medium text-indigo-400 text-xs">#</th>
