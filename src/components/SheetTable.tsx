@@ -6,11 +6,12 @@ import * as XLSX from 'xlsx';
 interface SheetTableProps {
   sheet: SheetData;
   fileName: string;
+  onCellEdit: (rowIdx: number, colIdx: number, value: string) => void;
 }
 
 type SortDir = 'asc' | 'desc' | null;
 
-export default function SheetTable({ sheet, fileName }: SheetTableProps) {
+export default function SheetTable({ sheet, fileName, onCellEdit }: SheetTableProps) {
   const [search, setSearch] = useState('');
   const [columnFilters, setColumnFilters] = useState<Record<number, string>>({});
   const [sortCol, setSortCol] = useState<number | null>(null);
@@ -19,6 +20,8 @@ export default function SheetTable({ sheet, fileName }: SheetTableProps) {
   const [showColPanel, setShowColPanel] = useState(false);
   const [hiddenCols, setHiddenCols] = useState<Record<number, boolean>>({});
   const [fontSize, setFontSize] = useState<number>(14); // default font size is 14px (text-sm is 14px)
+  const [editingCell, setEditingCell] = useState<{ rowIdx: number; colIdx: number } | null>(null);
+  const [editValue, setEditValue] = useState<string>('');
   const PAGE_SIZE = 50;
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -74,8 +77,17 @@ export default function SheetTable({ sheet, fileName }: SheetTableProps) {
     setPage(1);
   };
 
+  // Keep track of the original row indexes from sheet.rows so that editing points to correct absolute indices
+  const rowsWithIndexes = useMemo(() => {
+    return sheet.rows.map((row, idx) => ({
+      originalIdx: idx,
+      cells: row,
+    }));
+  }, [sheet.rows]);
+
   const filtered = useMemo(() => {
-    return sheet.rows.filter((row) => {
+    return rowsWithIndexes.filter((rowObj) => {
+      const row = rowObj.cells;
       // 1. Global Search Filter
       if (deferredSearch.trim()) {
         const q = deferredSearch.toLowerCase();
@@ -107,13 +119,13 @@ export default function SheetTable({ sheet, fileName }: SheetTableProps) {
 
       return true;
     });
-  }, [sheet.rows, deferredSearch, hiddenCols, deferredColumnFilters]);
+  }, [rowsWithIndexes, deferredSearch, hiddenCols, deferredColumnFilters]);
 
   const sorted = useMemo(() => {
     if (sortCol === null || sortDir === null) return filtered;
     return [...filtered].sort((a, b) => {
-      const av = a[sortCol] ?? '';
-      const bv = b[sortCol] ?? '';
+      const av = a.cells[sortCol] ?? '';
+      const bv = b.cells[sortCol] ?? '';
       const cmp =
         typeof av === 'number' && typeof bv === 'number'
           ? av - bv
@@ -151,6 +163,20 @@ export default function SheetTable({ sheet, fileName }: SheetTableProps) {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sheet.name);
     XLSX.writeFile(wb, `${fileName.replace(/\.[^.]+$/, '')}_${sheet.name}.xlsx`);
+  };
+
+  const handleCellBlur = (origRowIdx: number, colIdx: number) => {
+    onCellEdit(origRowIdx, colIdx, editValue);
+    setEditingCell(null);
+  };
+
+  const handleCellKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, origRowIdx: number, colIdx: number) => {
+    if (e.key === 'Enter') {
+      onCellEdit(origRowIdx, colIdx, editValue);
+      setEditingCell(null);
+    } else if (e.key === 'Escape') {
+      setEditingCell(null);
+    }
   };
 
   const SortIcon = ({ idx }: { idx: number }) => {
@@ -216,6 +242,10 @@ export default function SheetTable({ sheet, fileName }: SheetTableProps) {
             >
               A+
             </button>
+          </div>
+          <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg shadow-sm">
+            <span className="font-semibold">✏️ Hint:</span>
+            <span>Double-click any cell to edit details!</span>
           </div>
         </div>
         <div className="hidden lg:flex items-center gap-1.5 text-xs text-indigo-500 bg-indigo-50 px-3 py-2 rounded-lg border border-indigo-100 shadow-sm">
@@ -338,11 +368,11 @@ export default function SheetTable({ sheet, fileName }: SheetTableProps) {
                 </td>
               </tr>
             ) : (
-              pageRows.map((row, ri) => {
+              pageRows.map((rowObj, ri) => {
                 const absIdx = (page - 1) * PAGE_SIZE + ri;
                 return (
                   <tr
-                    key={absIdx}
+                    key={rowObj.originalIdx}
                     className={`transition-colors hover:bg-indigo-50/60 ${
                       absIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'
                     }`}
@@ -352,15 +382,35 @@ export default function SheetTable({ sheet, fileName }: SheetTableProps) {
                     </td>
                     {sheet.headers.map((_, ci) => {
                       if (hiddenCols[ci]) return null;
-                      const val = row[ci];
+                      const val = rowObj.cells[ci];
+                      const isEditing = editingCell?.rowIdx === rowObj.originalIdx && editingCell?.colIdx === ci;
+
                       return (
                         <td
                           key={ci}
-                          className="max-w-xs truncate px-4 py-2.5 text-slate-700"
-                          title={val !== null && val !== undefined ? String(val) : ''}
+                          onDoubleClick={() => {
+                            setEditingCell({ rowIdx: rowObj.originalIdx, colIdx: ci });
+                            setEditValue(val !== null && val !== undefined ? String(val) : '');
+                          }}
+                          className={`max-w-xs truncate px-4 py-2.5 text-slate-700 cursor-pointer ${
+                            isEditing ? 'p-1 bg-indigo-50/50' : 'hover:bg-slate-100/50'
+                          }`}
+                          title={isEditing ? '' : (val !== null && val !== undefined ? String(val) + " (Double-click to edit)" : 'Double-click to edit')}
                         >
-                          {val !== null && val !== undefined ? String(val) : (
-                            <span className="text-slate-300">—</span>
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onBlur={() => handleCellBlur(rowObj.originalIdx, ci)}
+                              onKeyDown={(e) => handleCellKeyDown(e, rowObj.originalIdx, ci)}
+                              autoFocus
+                              className="w-full rounded border border-indigo-400 bg-white px-2 py-1 text-sm text-slate-800 outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm"
+                            />
+                          ) : (
+                            val !== null && val !== undefined ? String(val) : (
+                              <span className="text-slate-300">—</span>
+                            )
                           )}
                         </td>
                       );

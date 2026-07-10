@@ -37,6 +37,26 @@ export default function App() {
     setActiveSheet(0);
   };
 
+  const handleCellEdit = (rowIdx: number, colIdx: number, newValue: string) => {
+    if (!workbook) return;
+    const newWorkbook = { ...workbook };
+    const targetSheet = newWorkbook.sheets[activeSheet];
+    
+    let parsedValue: string | number | boolean | null = newValue;
+    if (newValue === '') {
+      parsedValue = null;
+    } else if (newValue.toLowerCase() === 'true') {
+      parsedValue = true;
+    } else if (newValue.toLowerCase() === 'false') {
+      parsedValue = false;
+    } else if (!isNaN(Number(newValue)) && newValue.trim() !== '') {
+      parsedValue = Number(newValue);
+    }
+
+    targetSheet.rows[rowIdx][colIdx] = parsedValue;
+    setWorkbook(newWorkbook);
+  };
+
   const sheet = workbook?.sheets[activeSheet];
 
   return (
@@ -186,7 +206,7 @@ export default function App() {
                     This sheet appears to be empty.
                   </div>
                 ) : view === 'table' ? (
-                  <SheetTable sheet={sheet} fileName={workbook.fileName} />
+                  <SheetTable sheet={sheet} fileName={workbook.fileName} onCellEdit={handleCellEdit} />
                 ) : view === 'stats' ? (
                   <div className="flex flex-col gap-3">
                     <p className="text-sm text-slate-500">
