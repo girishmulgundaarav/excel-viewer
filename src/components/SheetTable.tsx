@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Download, Eye, EyeOff, SlidersHorizontal } from 'lucide-react';
+import { useState, useMemo, useRef } from 'react';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Download, Eye, EyeOff, SlidersHorizontal, ArrowLeft, ArrowRight } from 'lucide-react';
 import type { SheetData } from '../types/excel';
 import * as XLSX from 'xlsx';
 
@@ -19,6 +19,23 @@ export default function SheetTable({ sheet, fileName }: SheetTableProps) {
   const [showColPanel, setShowColPanel] = useState(false);
   const [hiddenCols, setHiddenCols] = useState<Record<number, boolean>>({});
   const PAGE_SIZE = 50;
+
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  const scrollLeftMost = () => {
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+    }
+  };
+
+  const scrollRightMost = () => {
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollTo({
+        left: tableContainerRef.current.scrollWidth,
+        behavior: 'smooth',
+      });
+    }
+  };
 
   const toggleColumn = (idx: number) => {
     setHiddenCols((prev) => ({
@@ -179,7 +196,23 @@ export default function SheetTable({ sheet, fileName }: SheetTableProps) {
         </div>
         <div className="hidden lg:flex items-center gap-1.5 text-xs text-indigo-500 bg-indigo-50 px-3 py-2 rounded-lg border border-indigo-100 shadow-sm">
           <span className="font-semibold">💡 Pro-tip:</span>
-          <span>Hold <kbd className="bg-white px-1.5 py-0.5 rounded border border-indigo-200 font-sans font-bold text-[10px]">Shift</kbd> + scroll mouse wheel to scroll horizontally!</span>
+          <span>Hold <kbd className="bg-white px-1.5 py-0.5 rounded border border-indigo-200 font-sans font-bold text-[10px]">Shift</kbd> + scroll mouse wheel, or use:</span>
+          <div className="flex items-center gap-1 ml-1 bg-white border border-indigo-200 rounded-md p-0.5">
+            <button
+              onClick={scrollLeftMost}
+              title="Scroll to first column (Left)"
+              className="p-1 rounded text-indigo-600 hover:bg-indigo-50 active:bg-indigo-100 transition-colors cursor-pointer"
+            >
+              <ArrowLeft size={13} />
+            </button>
+            <button
+              onClick={scrollRightMost}
+              title="Scroll to last column (Right)"
+              className="p-1 rounded text-indigo-600 hover:bg-indigo-50 active:bg-indigo-100 transition-colors cursor-pointer"
+            >
+              <ArrowRight size={13} />
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-3 text-sm text-slate-500">
           <span>{sorted.length.toLocaleString()} row{sorted.length !== 1 ? 's' : ''}</span>
@@ -237,7 +270,7 @@ export default function SheetTable({ sheet, fileName }: SheetTableProps) {
       )}
 
       {/* Table */}
-      <div className="overflow-auto rounded-xl border border-slate-200 shadow-sm max-h-[calc(100vh-280px)]">
+      <div ref={tableContainerRef} className="overflow-auto rounded-xl border border-slate-200 shadow-sm max-h-[calc(100vh-280px)]">
         <table className="min-w-full text-sm border-collapse">
           <thead className="sticky top-0 z-10 bg-indigo-600 shadow-[0_2px_4px_rgba(0,0,0,0.08)]">
             <tr className="bg-gradient-to-r from-indigo-600 to-violet-600 text-white">
