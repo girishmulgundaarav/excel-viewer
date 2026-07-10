@@ -9,6 +9,7 @@ interface SheetChartsProps {
 type ChartType = 'bar' | 'line' | 'pie';
 
 export default function SheetCharts({ sheet }: SheetChartsProps) {
+  const [chartMode, setChartMode] = useState<'one-col' | 'two-cols'>('two-col' as any === 'two-col' ? 'two-cols' : 'one-col');
   const [labelColIdx, setLabelColIdx] = useState<number>(0);
   const [valueColIdx, setValueColIdx] = useState<number>(1);
   const [chartType, setChartType] = useState<ChartType>('bar');
@@ -27,31 +28,45 @@ export default function SheetCharts({ sheet }: SheetChartsProps) {
     const dataMap = new Map<string, number>();
 
     sheet.rows.forEach((row) => {
-      const rawLabel = row[labelColIdx];
-      const rawValue = row[valueColIdx];
+      if (chartMode === 'one-col') {
+        // Mode 1: Frequency distribution count of a single column
+        const rawLabel = row[labelColIdx];
+        const label = rawLabel !== null && rawLabel !== undefined && String(rawLabel).trim() !== '' 
+          ? String(rawLabel).trim() 
+          : 'Empty / Blank';
+        
+        dataMap.set(label, (dataMap.get(label) || 0) + 1);
+      } else {
+        // Mode 2: Multi-column key & values aggregation (sum)
+        const rawLabel = row[labelColIdx];
+        const rawValue = row[valueColIdx];
 
-      const label = rawLabel !== null && rawLabel !== undefined ? String(rawLabel).trim() : 'Blank';
-      
-      // Convert rawValue to float/number safely
-      let value = 0;
-      if (typeof rawValue === 'number') {
-        value = rawValue;
-      } else if (rawValue !== null && rawValue !== undefined) {
-        const parsed = parseFloat(String(rawValue).replace(/[^0-9.-]/g, ''));
-        if (!isNaN(parsed)) {
-          value = parsed;
+        const label = rawLabel !== null && rawLabel !== undefined && String(rawLabel).trim() !== '' 
+          ? String(rawLabel).trim() 
+          : 'Empty / Blank';
+        
+        // Convert rawValue to float/number safely
+        let value = 0;
+        if (typeof rawValue === 'number') {
+          value = rawValue;
+        } else if (rawValue !== null && rawValue !== undefined) {
+          const parsed = parseFloat(String(rawValue).replace(/[^0-9.-]/g, ''));
+          if (!isNaN(parsed)) {
+            value = parsed;
+          }
         }
-      }
 
-      dataMap.set(label, (dataMap.get(label) || 0) + value);
+        dataMap.set(label, (dataMap.get(label) || 0) + value);
+      }
     });
 
-    // Format and sort/limit top entries
+    // Format and sort desc by values, then limit top entries
     return Array.from(dataMap.entries())
       .map(([label, value]) => ({ label, value }))
-      .filter((item) => item.label !== '' && !isNaN(item.value))
+      .filter((item) => !isNaN(item.value))
+      .sort((a, b) => b.value - a.value) // Sort Descending to highlight Top entries
       .slice(0, limit);
-  }, [sheet.rows, labelColIdx, valueColIdx, limit]);
+  }, [sheet.rows, chartMode, labelColIdx, valueColIdx, limit]);
 
   const maxVal = useMemo(() => {
     const vals = chartData.map((d) => d.value);
@@ -293,13 +308,42 @@ export default function SheetCharts({ sheet }: SheetChartsProps) {
   };
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col items-center gap-5">
       {/* Chart controls toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="w-full flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-4">
+          {/* Analysis Mode Toggle */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Analysis Mode</label>
+            <div className="flex rounded-lg border border-slate-200 overflow-hidden text-sm bg-slate-50 p-0.5">
+              <button
+                onClick={() => setChartMode('one-col')}
+                className={`px-3 py-1 rounded-md font-semibold transition-all ${
+                  chartMode === 'one-col'
+                    ? 'bg-white text-indigo-600 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-950'
+                }`}
+              >
+                1 Column (Count)
+              </button>
+              <button
+                onClick={() => setChartMode('two-cols')}
+                className={`px-3 py-1 rounded-md font-semibold transition-all ${
+                  chartMode === 'two-cols'
+                    ? 'bg-white text-indigo-600 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-950'
+                }`}
+              >
+                2 Columns (Sum)
+              </button>
+            </div>
+          </div>
+
           {/* Label selector */}
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Labels Column (X-Axis)</label>
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              {chartMode === 'one-col' ? 'Select Column' : 'Labels Column (X-Axis)'}
+            </label>
             <select
               value={labelColIdx}
               onChange={(e) => setLabelColIdx(Number(e.target.value))}
@@ -314,20 +358,22 @@ export default function SheetCharts({ sheet }: SheetChartsProps) {
           </div>
 
           {/* Value selector */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Values Column (Y-Axis)</label>
-            <select
-              value={valueColIdx}
-              onChange={(e) => setValueColIdx(Number(e.target.value))}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 shadow-sm focus:border-indigo-400 focus:outline-none"
-            >
-              {columns.map((c) => (
-                <option key={c.idx} value={c.idx}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {chartMode === 'two-cols' && (
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Values Column (Y-Axis)</label>
+              <select
+                value={valueColIdx}
+                onChange={(e) => setValueColIdx(Number(e.target.value))}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 shadow-sm focus:border-indigo-400 focus:outline-none"
+              >
+                {columns.map((c) => (
+                  <option key={c.idx} value={c.idx}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Chart count limit */}
           <div className="flex flex-col gap-1">
@@ -376,13 +422,23 @@ export default function SheetCharts({ sheet }: SheetChartsProps) {
       </div>
 
       {/* Main SVG Render Area */}
-      <div className="flex flex-col gap-2">
-        <p className="text-xs text-slate-400 font-medium">
-          Plotting <strong>{chartData.length} entries</strong> of{' '}
-          {sheet.headers[valueColIdx] || `Col ${valueColIdx + 1}`} grouped by{' '}
-          {sheet.headers[labelColIdx] || `Col ${labelColIdx + 1}`}
+      <div className="w-full max-w-3xl flex flex-col gap-2">
+        <p className="text-xs text-slate-400 font-medium text-center">
+          {chartMode === 'one-col' ? (
+            <>
+              Displaying value distribution for column <strong>{sheet.headers[labelColIdx] || `Col ${labelColIdx + 1}`}</strong> (unique count list)
+            </>
+          ) : (
+            <>
+              Plotting <strong>{chartData.length} entries</strong> of{' '}
+              {sheet.headers[valueColIdx] || `Col ${valueColIdx + 1}`} grouped by{' '}
+              {sheet.headers[labelColIdx] || `Col ${labelColIdx + 1}`} (aggregate sum)
+            </>
+          )}
         </p>
-        {renderSVGChart()}
+        <div className="w-full flex justify-center">
+          {renderSVGChart()}
+        </div>
       </div>
     </div>
   );
