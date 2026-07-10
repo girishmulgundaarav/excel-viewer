@@ -27,6 +27,42 @@ export function parseExcelFile(file: File): Promise<WorkbookData> {
           );
           let rows = jsonData.slice(1) as (string | number | boolean | null)[][];
 
+          // Function to standardize date formats to DD/MM/YYYY
+          const standardizeDateValue = (val: string | number | boolean | null): string | number | boolean | null => {
+            if (typeof val !== 'string') return val;
+            
+            // Matches formats like D/M/YY, DD/M/YY, D/MM/YY, DD/MM/YYYY with slashes, dots or hyphens
+            const dateRegex = /^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/;
+            const match = val.trim().match(dateRegex);
+            
+            if (match) {
+              let [_, d, m, y] = match;
+              
+              // Pad day with leading zero if single digit
+              const day = d.padStart(2, '0');
+              // Pad month with leading zero if single digit
+              const month = m.padStart(2, '0');
+              
+              // Standardize 2-digit years to 4-digit years based on DOB standard (current year is 2026)
+              let year = y;
+              if (y.length === 2) {
+                const numericYear = parseInt(y, 10);
+                if (numericYear <= 26) {
+                  year = `20${y.padStart(2, '0')}`;
+                } else {
+                  year = `19${y.padStart(2, '0')}`;
+                }
+              }
+              
+              return `${day}/${month}/${year}`;
+            }
+            
+            return val;
+          };
+
+          // Apply date standardizations across all cells
+          rows = rows.map((row) => row.map(standardizeDateValue));
+
           // Auto-fill merged cells down and right
           if (worksheet['!merges']) {
             worksheet['!merges'].forEach((merge) => {
