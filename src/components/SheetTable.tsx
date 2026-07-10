@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useDeferredValue } from 'react';
 import { Search, ArrowUpDown, ArrowUp, ArrowDown, Download, Eye, EyeOff, SlidersHorizontal, ArrowLeft, ArrowRight } from 'lucide-react';
 import type { SheetData } from '../types/excel';
 import * as XLSX from 'xlsx';
@@ -21,6 +21,10 @@ export default function SheetTable({ sheet, fileName }: SheetTableProps) {
   const PAGE_SIZE = 50;
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  // Defer expensive computations so typing in search inputs remains fast and lag-free.
+  const deferredSearch = useDeferredValue(search);
+  const deferredColumnFilters = useDeferredValue(columnFilters);
 
   const scrollLeftMost = () => {
     if (tableContainerRef.current) {
@@ -72,8 +76,8 @@ export default function SheetTable({ sheet, fileName }: SheetTableProps) {
   const filtered = useMemo(() => {
     return sheet.rows.filter((row) => {
       // 1. Global Search Filter
-      if (search.trim()) {
-        const q = search.toLowerCase();
+      if (deferredSearch.trim()) {
+        const q = deferredSearch.toLowerCase();
         const matchesGlobal = row.some(
           (cell, ci) => !hiddenCols[ci] && cell !== null && String(cell).toLowerCase().includes(q)
         );
@@ -81,7 +85,7 @@ export default function SheetTable({ sheet, fileName }: SheetTableProps) {
       }
 
       // 2. Individual Column Filters
-      for (const [colIdxStr, filterVal] of Object.entries(columnFilters)) {
+      for (const [colIdxStr, filterVal] of Object.entries(deferredColumnFilters)) {
         const colIdx = Number(colIdxStr);
         const q = filterVal.trim().toLowerCase();
         if (!q || hiddenCols[colIdx]) continue;
@@ -102,7 +106,7 @@ export default function SheetTable({ sheet, fileName }: SheetTableProps) {
 
       return true;
     });
-  }, [sheet.rows, search, hiddenCols, columnFilters]);
+  }, [sheet.rows, deferredSearch, hiddenCols, deferredColumnFilters]);
 
   const sorted = useMemo(() => {
     if (sortCol === null || sortDir === null) return filtered;
