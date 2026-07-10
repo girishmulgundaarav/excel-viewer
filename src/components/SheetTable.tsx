@@ -158,7 +158,8 @@ export default function SheetTable({ sheet, fileName, onCellEdit }: SheetTablePr
   const exportSheet = () => {
     // Only export non-hidden columns
     const filteredHeaders = sheet.headers.filter((_, ci) => !hiddenCols[ci]);
-    const filteredRows = sheet.rows.map((row) => row.filter((_, ci) => !hiddenCols[ci]));
+    // Only export filtered and sorted rows
+    const filteredRows = sorted.map((rowObj) => rowObj.cells.filter((_, ci) => !hiddenCols[ci]));
     const ws = XLSX.utils.aoa_to_sheet([filteredHeaders, ...filteredRows]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sheet.name);
