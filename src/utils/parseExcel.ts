@@ -23,7 +23,40 @@ export function parseExcelFile(file: File): Promise<WorkbookData> {
           const headers = (jsonData[0] as (string | number | boolean | null)[]).map((h) =>
             h !== null && h !== undefined ? String(h) : ''
           );
-          const rows = jsonData.slice(1) as (string | number | boolean | null)[][];
+          let rows = jsonData.slice(1) as (string | number | boolean | null)[][];
+
+          // Auto-fill merged cells down and right
+          if (worksheet['!merges']) {
+            worksheet['!merges'].forEach((merge) => {
+              const startRow = merge.s.r; // 0-based row index in SheetJS
+              const startCol = merge.s.c; // 0-based col index
+              const endRow = merge.e.r;
+              const endCol = merge.e.c;
+
+              // The main value sits at the top-left cell of the merged block
+              // Subtract 1 because headers (row 0) were sliced off.
+              const dataStartRow = startRow - 1;
+              const dataEndRow = endRow - 1;
+
+              // Ensure the coordinates fall inside the parsed rows bounds
+              if (dataStartRow >= 0 && dataStartRow < rows.length) {
+                const mergedValue = rows[dataStartRow][startCol];
+
+                // Replicate the value down and right across the entire merged range
+                for (let r = Math.max(0, dataStartRow); r <= Math.min(rows.length - 1, dataEndRow); r++) {
+                  for (let c = startCol; c <= endCol; c++) {
+                    if (r === dataStartRow && c === startCol) continue; // Skip top-left itself
+                    
+                    // Pad cols dynamically if the row array is too short
+                    while (rows[r].length <= c) {
+                      rows[r].push(null);
+                    }
+                    rows[r][c] = mergedValue;
+                  }
+                }
+              }
+            });
+          }
 
           return { name, headers, rows };
         });
