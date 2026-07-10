@@ -7,13 +7,14 @@ export function parseExcelFile(file: File): Promise<WorkbookData> {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
+        // Force cellDates to true and raw to false to let SheetJS parse and format Excel/CSV date serial codes automatically
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true, raw: false });
 
         const sheets: SheetData[] = workbook.SheetNames.map((name) => {
           const worksheet = workbook.Sheets[name];
           const jsonData = XLSX.utils.sheet_to_json<(string | number | boolean | null)[]>(
             worksheet,
-            { header: 1, defval: null }
+            { header: 1, defval: null, raw: false }
           );
 
           if (jsonData.length === 0) {
